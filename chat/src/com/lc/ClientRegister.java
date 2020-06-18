@@ -1,5 +1,7 @@
 package com.lc;
 
+import com.lc.DButils.DButils;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -14,11 +16,11 @@ public class ClientRegister extends JFrame {
     private JButton regiBt = new JButton("注册");
     private JButton stopBt = new JButton("关闭");
 
-    //账号输入框
+    // 账号输入框
     private JTextField uTF = new JTextField(20);
-    //密码输入框
+    // 密码输入框
     private JPasswordField pTF1 = new JPasswordField(20);
-    //重新确认输入框
+    // 重新确认输入框
     private JPasswordField pTF2 = new JPasswordField(20);
     JLabel interestLabel = new JLabel("账   号:");
     JLabel interestLabe2 = new JLabel("密   码：");
@@ -35,10 +37,15 @@ public class ClientRegister extends JFrame {
 
 
     private JLabel jBP = new JLabel();
+
+    /**
+     * 构造方法
+     * @throws HeadlessException
+     */
     public ClientRegister() throws HeadlessException {
-        //初始化
+        // 初始化
         init();
-        //监听
+        // 监听
         regiBt.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -55,7 +62,7 @@ public class ClientRegister extends JFrame {
                     return;
                 }
                 System.out.println(string1 + string2);
-                //写入数据库内
+                // 写入数据库内
                 register(string1, string2);
 
             }
@@ -69,6 +76,9 @@ public class ClientRegister extends JFrame {
 
     }
 
+    /**
+     * 初始化
+     */
     private void init(){
         this.setTitle("注册界面");
         this.setBounds(0,0,500,500);
@@ -118,82 +128,54 @@ public class ClientRegister extends JFrame {
 
         jPanel.setVisible(true);
 
-
-
         this.setVisible(true);
-
-
 
 
 
     }
     private void register(String name,String password){
         Connection connection = null;
-        Statement statement = null;
+        // 改为预执行的statement
+        PreparedStatement ps= null;
         ResultSet resultSet = null;
-        //从配置文件获取url，用户,密码，驱动
-        ResourceBundle bundle = ResourceBundle.getBundle(CONFIG);
-        String driver = bundle.getString("driver");
-        String url = bundle.getString("url");
-        String dataUser = bundle.getString("dateUser");
-        String datePassword = bundle.getString("datePassword");
-        String tableUser = bundle.getString("tableUser");
-
-
         try {
-            //建立连接
-            Class.forName(driver);
-            connection = DriverManager.getConnection(url, dataUser, datePassword);
-            statement = connection.createStatement();
-            String sqlSelect = "select name from t_user";
-            resultSet = statement.executeQuery(sqlSelect);
-            //递归判断是否正确
-            while (resultSet.next()) {
-                if (name.equals(resultSet.getString(tableUser))) {
-                    System.out.println("该用户已存在");
-                    isExists = true;
-                    return;
-                }
-            }
-            if (!isExists){
-                String sqlRegister = "insert into t_user (name, password) value(" + "'" + name+"','" + password + "')";
-                int count = statement.executeUpdate(sqlRegister);
-                System.out.println(count == 1? "注册成功！":"注册失败！");
+            // 建立连接
+            connection = DButils.getConnection();
+            String sql = "select * from t_user where name = ?";
+            ps = connection.prepareStatement(sql);
+            ps.setString(1, name);
+            // 这里修改查询方式
+            resultSet = ps.executeQuery();
 
-
+            // 如果不存在，建立用户
+            if (!resultSet.next()) {
+                String sqlRegister = "insert into t_user (name, password) value( ?, ?)";
+                //预执行
+                ps = connection.prepareStatement(sqlRegister);
+                ps.setString(1, name);
+                ps.setString(2, password);
+                int count = ps.executeUpdate();
+                System.out.println(count == 1 ? "注册成功！" : "注册失败！");
             }
-            } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        } catch (SQLException throwables) {
+        }
+          catch (Exception throwables) {
             throwables.printStackTrace();
         } finally {
-            if (resultSet != null){
-                try {
-                    resultSet.close();
-                } catch (SQLException throwables) {
-                    throwables.printStackTrace();
-                }
-            }
-            if (statement != null){
-                try {
-                    statement.close();
-                } catch (SQLException throwables) {
-                    throwables.printStackTrace();
-                }
-            }
-            if (connection != null){
-                try {
-                    connection.close();
-                } catch (SQLException throwables) {
-                    throwables.printStackTrace();
-                }
-            }
+            // 使用工具类关闭
+            DButils.close(resultSet, ps, connection);
         }
 
     }
-    private String readPath(String s,String key){
-       //使用资源绑定器,获取config配置
-        ResourceBundle bundle = ResourceBundle.getBundle(s);
+
+    /**
+     * 获取文件路径
+     * @param file 配置文件
+     * @param key 获取文件的名称
+     * @return
+     */
+    private String readPath(String file,String key){
+       // 使用资源绑定器,获取config配置
+        ResourceBundle bundle = ResourceBundle.getBundle(file);
         System.out.println(bundle.getString(key));
         return Thread.currentThread().getContextClassLoader()
                 .getResource(bundle.getString(key))
@@ -202,7 +184,7 @@ public class ClientRegister extends JFrame {
     }
 
     public static void main(String[] args) {
-        //测试
+        // 测试
         ClientRegister clientRegister = new ClientRegister();
         clientRegister.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 

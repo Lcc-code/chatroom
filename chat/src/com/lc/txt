@@ -8,9 +8,7 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
-import java.net.ConnectException;
-import java.net.Socket;
-import java.net.SocketException;
+import java.net.*;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,12 +21,12 @@ public class ClientChat extends JFrame {
 
     // 声明一个显示纯文本的多行区域
     private JTextArea tA = new JTextArea(10,20);
-    private JPanel jPanel2 = new JPanel(new FlowLayout(30));
     // 编辑单行文本框
     private JTextField tF = new JTextField(20);
 
     // 文本区加滚动条
     private JScrollPane sP = new JScrollPane(tA);
+
     // 文件选择按钮
     private JButton chooseBt = new JButton("选择图片");
     private JFileChooser chooser = new JFileChooser();
@@ -43,9 +41,31 @@ public class ClientChat extends JFrame {
     private boolean isConn = false;
     private boolean isRight = false;
 
-    private DataOutputStream oS = null;
+    private DataOutputStream os= null;
     private JLabel jBP = new JLabel();
     private static final String CONFIG = "config";
+
+    /**
+     * 图片开始的标识
+     */
+    private final String IMAGE_START = "image:";
+    /**
+     * 一条完整信息结束的标识
+     */
+    private final String MESSAGE_END = "over";
+    /**
+     * 文件名结束的表示
+     */
+    private final String FILE_NAME_END = "?";
+    /**
+     * 默认的编码，我的是UTF-8，大家可以更改成自己的编码
+     */
+    private final String DEFAULT_ENCODE = "UTF-8";
+    /**
+     * ISO编码
+     */
+    private final String ISO_ENCODE = "ISO-8859-1";
+
 
 
 
@@ -134,7 +154,9 @@ public class ClientChat extends JFrame {
      * 初始化方法
      * @param user 用户名
      */
-    private void init(String user){
+    private void init(String user) {
+
+
 
         this.setTitle(user + "的窗口");
         // 将文本区域添加到中间位置
@@ -145,6 +167,10 @@ public class ClientChat extends JFrame {
         /*this.add(tF,BorderLayout.SOUTH);
         this.add(jLabel, BorderLayout.EAST);*/
         this.add(jPanel,BorderLayout.SOUTH);
+
+
+
+
         // 设置区域大小
         this.setBounds(300,300,400,400);
         // 设置显示框区域无法输入
@@ -157,7 +183,9 @@ public class ClientChat extends JFrame {
         jBP.setIcon(new ImageIcon(readPath(CONFIG,"BackgroundPicture2")));
         this.add(jBP,BorderLayout.NORTH);
 
+
         this.setVisible(true);
+
 
         (new Thread(new Receive())).start();
 
@@ -173,15 +201,12 @@ public class ClientChat extends JFrame {
                     return;
                 }
                 // 上传\
-                send(user,strSend, null);
-
+                send(user,strSend,null);
                 // 判断输入字符长度
-
-                tF.setText(" ");
+                tA.setText(strSend);
 
             }
         });
-
         chooseBt.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -202,15 +227,12 @@ public class ClientChat extends JFrame {
                 }
             }
         });
+
         connect();
         // 关闭操作设置
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
     }
-
-    /**
-     * 连接
-     */
     public void connect(){
         try {
 
@@ -221,67 +243,6 @@ public class ClientChat extends JFrame {
             tA.append("服务器下线没开着");
         } catch (IOException e) {
             e.printStackTrace();
-        }
-    }
-
-    /**
-     * 发送消息给服务器
-     * @param user
-     * @param string
-     */
-    public void send(String user,String string, String type){
-        try {
-            //创建输出字节流
-            oS = new DataOutputStream(socket.getOutputStream());
-            if ("picture".equals(type)){
-                String imageData = Base64Utils.GetImageStr(string);
-                oS.writeUTF( user+ ":" + "|"+ imageData + "&");
-            }
-            else {
-                //写入字节
-                oS.writeUTF( user+ ":" + string);
-            }
-            oS.flush();
-
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-    //多线程的类，实现Runnable接口
-    class Receive implements Runnable{
-        @Override
-        public void run(){
-            try {
-                StringBuffer sb = new StringBuffer();
-                int imageCount = 0;
-                int s ;
-                int e = 0;
-                while (isConn) {
-                    DataInputStream dIS = new DataInputStream(socket.getInputStream());
-                    // 接收信息
-                    String string = dIS.readUTF();
-                    if ((s=string.indexOf("|"))>0 && (e =string.indexOf("&"))>0){
-                        String s2 = string.substring(s+ 1,e);
-                        System.out.println(s2);
-                        Base64Utils.GenerateImage(s2, "C:\\Users\\hp\\Desktop\\picture\\"+imageCount+".png");
-                        imageCount ++;
-                        tA.append(string.substring(0,s+1) + "：上传了一张图片！" + "\n");
-                    }else {
-                        tA.append(string);
-                    }
-
-
-                }
-            }catch (SocketException e){
-                System.out.println("服务器中断");
-            }
-            catch (EOFException e){
-                System.out.println("服务器中断");
-                tA.append("服务器中断！");
-            }catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
     public String readPath(String s,String key){
@@ -324,6 +285,55 @@ public class ClientChat extends JFrame {
 
     }
 
+    public void send(String user,String string,String type) {
+        try {
+            os = new DataOutputStream(socket.getOutputStream());
+            if ("picture".equals(type)) {
+                Base64Utils.GetImageStr(string);
+            }
+            else{
+                //创建输出字节流
+                os= new DataOutputStream(socket.getOutputStream());
+                //写入字节
+                os.writeUTF(user + "：" + string);
+
+            }
+            os.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+
+    }
+    class Receive implements Runnable {
+        @Override
+        public void run() {
+            while (!isConn) {
+                try {
+                    while (isConn) {
+                        DataInputStream dIS = new DataInputStream(socket.getInputStream());
+                        // 接收信息
+                        String string = dIS.readUTF();
+                        tA.append(string);
+
+                    }
+                }catch (SocketException e){
+                    System.out.println("服务器中断");
+                }
+                catch (EOFException e){
+                    System.out.println("服务器中断");
+                    tA.append("服务器中断！");
+                }catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+
+
+        }
+    }
+
     /**
      * 登录类
      */
@@ -340,6 +350,8 @@ public class ClientChat extends JFrame {
         private JTextField jTextField1 = new JTextField();
         private JTextField jTextField2 = new JTextField();
         private JPanel jPanel = new JPanel();
+        // 文件选择器
+        private JFileChooser chooser = new JFileChooser();
 
 
 
@@ -403,6 +415,8 @@ public class ClientChat extends JFrame {
             this.add(jBP,BorderLayout.NORTH);
 
 
+
+
             //面板对象
 
             jPanel.setLayout(null);
@@ -436,6 +450,23 @@ public class ClientChat extends JFrame {
 
             this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             this.setVisible(true);
+
+        }
+        private String chooser(JFileChooser jFileChooser ){
+            // 文件名过滤器
+            FileNameExtensionFilter filter = new FileNameExtensionFilter("图片文件", "jpg"
+                    , "png", "jpeg");
+            jFileChooser.setFileFilter(filter);
+
+            // 显示对话框
+            int ret = chooser.showOpenDialog(null);
+            // 获取用户选择的结果
+            if ( ret == JFileChooser.APPROVE_OPTION) {
+                // 结果为：已经存在一个文件
+                File file = chooser.getSelectedFile();
+                System.out.println(file.getAbsolutePath());
+                return file.getAbsolutePath();
+            }else return "未获取到文件";
 
         }
 
